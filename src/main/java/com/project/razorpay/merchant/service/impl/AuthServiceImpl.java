@@ -7,6 +7,7 @@ import com.project.razorpay.merchant.dto.request.MerchantSignUpRequest;
 import com.project.razorpay.merchant.dto.response.MerchantResponse;
 import com.project.razorpay.merchant.entity.AppUser;
 import com.project.razorpay.merchant.entity.Merchant;
+import com.project.razorpay.merchant.mapper.MerchantMapper;
 import com.project.razorpay.merchant.repository.AppUserRepository;
 import com.project.razorpay.merchant.repository.MerchantRepository;
 import com.project.razorpay.merchant.service.AuthService;
@@ -23,6 +24,8 @@ public class AuthServiceImpl implements AuthService {
      private final AppUserRepository appUserRepository;
      private final MerchantRepository merchantRepository;
 
+     private final MerchantMapper merchantMapper;
+
     @Override
     @Transactional
     public MerchantResponse signup(MerchantSignUpRequest request) {
@@ -33,13 +36,15 @@ public class AuthServiceImpl implements AuthService {
                     "Merchant with email already exists: "+request.email()
             );
         }
-        Merchant merchant = Merchant.builder()
-                .businessType(request.businessType())
-                .businessName(request.businessName())
-                .name(request.name())
-                .email(request.email())
-                .status(MerchantStatus.PENDING_KYC)
-                .build();
+//        Merchant merchant = Merchant.builder()
+//                .businessType(request.businessType())
+//                .businessName(request.businessName())
+//                .name(request.name())
+//                .email(request.email())
+//                .status(MerchantStatus.PENDING_KYC)
+//                .build();
+        Merchant merchant = merchantMapper.toEntityFromSignUpRequest(request);
+        merchant.setStatus(MerchantStatus.PENDING_KYC); // good to explicitly define the default values
         merchant = merchantRepository.save(merchant);
 
         AppUser appUser = AppUser.builder()
@@ -50,7 +55,8 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         appUserRepository.save(appUser);
 
-        return new MerchantResponse(merchant.getId(), merchant.getName(), merchant.getEmail(),
-                merchant.getBusinessName(), merchant.getBusinessType(), merchant.getStatus());
+//        return new MerchantResponse(merchant.getId(), merchant.getName(), merchant.getEmail(),
+//                merchant.getBusinessName(), merchant.getBusinessType(), merchant.getStatus());
+        return merchantMapper.toResponse(merchant);
     }
 }
