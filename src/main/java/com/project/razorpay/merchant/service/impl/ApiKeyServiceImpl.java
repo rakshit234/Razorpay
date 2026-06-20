@@ -7,6 +7,7 @@ import com.project.razorpay.merchant.dto.response.ApiKeyCreateResponse;
 import com.project.razorpay.merchant.dto.response.ApiKeyResponse;
 import com.project.razorpay.merchant.entity.ApiKey;
 import com.project.razorpay.merchant.entity.Merchant;
+import com.project.razorpay.merchant.mapper.ApiKeyMapper;
 import com.project.razorpay.merchant.repository.ApiKeyRepository;
 import com.project.razorpay.merchant.repository.MerchantRepository;
 import com.project.razorpay.merchant.service.ApiKeyService;
@@ -28,6 +29,8 @@ public class ApiKeyServiceImpl implements ApiKeyService {
      private final ApiKeyRepository apiKeyRepository;
      private final MerchantRepository merchantRepository;
 
+     private final ApiKeyMapper apiKeyMapper;
+
     @Override
     @Transactional
     public ApiKeyCreateResponse create(UUID merchantId, CreateApiKeyRequest request) {
@@ -47,22 +50,13 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         apiKey = apiKeyRepository.save(apiKey);
 
         return new ApiKeyCreateResponse(apiKey.getId(), keyId, rawSecret, request.environment());
-
+        // cannot use mapper since rawSecret has to be present only once, i.e., while creating it.
     }
 
     @Override
     public List<ApiKeyResponse> listByMerchant(UUID merchantId) {
-        return apiKeyRepository.findByMerchant_Id(merchantId)
-                .stream()
-                .map(apiKey -> new ApiKeyResponse(
-                        apiKey.getId(),
-                        apiKey.getKeyId(),
-                        apiKey.getEnvironment(),
-                        apiKey.isEnabled(),
-                        apiKey.getLastUsedAt(),
-                        null
-                ))
-                .toList();
+        return apiKeyMapper.toResponseList(apiKeyRepository.findByMerchant_Id(merchantId));
+
     }
 
     @Override
@@ -72,7 +66,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .filter(k->k.getMerchant().getId().equals(merchantId))
                 .orElseThrow(()-> new ResourceNotFoundException("ApiKey",keyId));
         key.setEnabled(false); // here springboot handles it automatically.
-        //        apiKeyRepository.save(key); // optional
+                               // apiKeyRepository.save(key); // optional
     }
 
     @Override
@@ -82,6 +76,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .filter(k->k.getMerchant().getId().equals(merchantId))
                 .orElseThrow(()-> new ResourceNotFoundException("ApiKey",keyId));
 
+        if(!apiKey.isEnabled()) throw new RuntimeException("Cannot rotate a disabled key");
 
         String newRawSecret = RandomizerUtil.randomBase64(40);
         apiKey.setPreviousKeySecretHash(apiKey.getKeySecretHash());
